@@ -1,57 +1,87 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   FiPieChart, FiBox, FiShoppingBag, FiDollarSign, 
   FiAlertTriangle, FiTrash2, FiEdit2, FiPlus, FiX 
 } from 'react-icons/fi';
 import { apiService } from '../services/apiService';
-import { CATEGORIES } from '../services/mockData';
 import { 
   setProductsStart, setProductsSuccess, setProductsFailure,
+  setCategoriesSuccess, addCategoryLocal,
   addProductLocal, updateProductLocal, deleteProductLocal 
 } from '../redux/productSlice';
 import { useToast } from '../components/Toast';
+import { selectUser, selectIsAuthenticated } from '../redux/authSlice';
 
 const AdminDashboardPage = () => {
   const dispatch = useDispatch();
   const triggerToast = useToast();
+  const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'analytics';
 
-  const { items: products, loading } = useSelector((state) => state.products);
+  const user = useSelector(selectUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false';
+
+  const { items: products, categories, loading } = useSelector((state) => state.products);
+
+  useEffect(() => {
+    if (useMockApi) return;
+    if (!isAuthenticated) {
+      triggerToast('Access denied. Please sign in as an admin!', 'warning');
+      navigate('/login');
+    } else if (user?.role !== 'ADMIN') {
+      triggerToast('Access denied. Admin privileges required!', 'warning');
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, user, navigate, triggerToast, useMockApi]);
 
   // States
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModalCategoty, setShowAddModalCategoty] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Product Form states
+  const [prodId, setProdId] = useState('');
   const [prodName, setProdName] = useState('');
-  const [prodCategory, setProdCategory] = useState('fruits-veg');
+  const [prodCategory, setProdCategory] = useState('');
   const [prodPrice, setProdPrice] = useState(0);
   const [prodOldPrice, setProdOldPrice] = useState(0);
   const [prodWeight, setProdWeight] = useState('500 g');
   const [prodDescription, setProdDescription] = useState('');
   const [prodImage, setProdImage] = useState('https://images.unsplash.com/photo-1610348725531-843dff163e2c?auto=format&fit=crop&q=80&w=400');
+  const [prodImages, setProdImages] = useState('');
   const [prodInStock, setProdInStock] = useState(true);
   const [prodDiscount, setProdDiscount] = useState(0);
   const [prodEta, setProdEta] = useState('10 mins');
 
+  const [categoryName, setCategoryName] = useState('');
+  const [count, setCount] = useState('');
+  const [image, setImage] = useState('');
+
   useEffect(() => {
     const fetchAdminData = async () => {
-      // Fetch products if not exists
-      if (products.length === 0) {
-        dispatch(setProductsStart());
-        try {
-          const data = await apiService.getProducts();
-          dispatch(setProductsSuccess(data));
-        } catch {
-          dispatch(setProductsFailure('Failed to load products'));
-        }
+      // Fetch products
+      dispatch(setProductsStart());
+      try {
+        const data = await apiService.getProducts();
+        dispatch(setProductsSuccess(data));
+      } catch {
+        dispatch(setProductsFailure('Failed to load products'));
+      }
+
+      // Fetch categories
+      try {
+        const data = await apiService.getCategories();
+        dispatch(setCategoriesSuccess(data));
+      } catch {
+        triggerToast('Failed to load categories', 'error');
       }
 
       // Fetch orders
@@ -67,11 +97,21 @@ const AdminDashboardPage = () => {
     };
 
     fetchAdminData();
-  }, [dispatch, products.length, triggerToast]);
+  }, [dispatch, triggerToast]);
+
+  useEffect(() => {
+    if (categories.length > 0 && !prodCategory) {
+      setProdCategory(categories[0].id);
+    }
+  }, [categories, prodCategory]);
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
+    const imagesArray = prodImages
+      ? prodImages.split(',').map(img => img.trim()).filter(img => img)
+      : [];
     const payload = {
+      id: prodId || undefined,
       name: prodName,
       category: prodCategory,
       price: Number(prodPrice),
@@ -79,6 +119,7 @@ const AdminDashboardPage = () => {
       weight: prodWeight,
       description: prodDescription,
       image: prodImage,
+      images: imagesArray,
       inStock: prodInStock,
       discount: Number(prodDiscount),
       eta: prodEta
@@ -95,8 +136,28 @@ const AdminDashboardPage = () => {
     }
   };
 
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: categoryName,
+      image: image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=200',
+      count: count ? Number(count) : 0
+    };
+
+    try {
+      const response = await apiService.addCategory(payload);
+      dispatch(addCategoryLocal(response));
+      triggerToast('Category added successfully!', 'success');
+      setShowAddModalCategoty(false);
+      resetCategoryForm();
+    } catch {
+      triggerToast('Failed to add category', 'error');
+    }
+  };
+
   const handleEditClick = (prod) => {
     setSelectedProduct(prod);
+    setProdId(prod.id);
     setProdName(prod.name);
     setProdCategory(prod.category);
     setProdPrice(prod.price);
@@ -104,6 +165,7 @@ const AdminDashboardPage = () => {
     setProdWeight(prod.weight);
     setProdDescription(prod.description);
     setProdImage(prod.image);
+    setProdImages(prod.images ? prod.images.join(', ') : '');
     setProdInStock(prod.inStock);
     setProdDiscount(prod.discount || 0);
     setProdEta(prod.eta || '10 mins');
@@ -114,6 +176,10 @@ const AdminDashboardPage = () => {
     e.preventDefault();
     if (!selectedProduct) return;
 
+    const imagesArray = prodImages
+      ? prodImages.split(',').map(img => img.trim()).filter(img => img)
+      : [];
+
     const payload = {
       name: prodName,
       category: prodCategory,
@@ -122,6 +188,7 @@ const AdminDashboardPage = () => {
       weight: prodWeight,
       description: prodDescription,
       image: prodImage,
+      images: imagesArray,
       inStock: prodInStock,
       discount: Number(prodDiscount),
       eta: prodEta
@@ -162,16 +229,29 @@ const AdminDashboardPage = () => {
   };
 
   const resetForm = () => {
+    setProdId('');
     setProdName('');
-    setProdCategory('fruits-veg');
+    setProdCategory(categories[0]?.id || '');
     setProdPrice(0);
     setProdOldPrice(0);
     setProdWeight('500 g');
     setProdDescription('');
     setProdImage('https://images.unsplash.com/photo-1610348725531-843dff163e2c?auto=format&fit=crop&q=80&w=400');
+    setProdImages('');
     setProdInStock(true);
     setProdDiscount(0);
     setProdEta('10 mins');
+  };
+
+  const openAddModal = () => {
+    resetForm();
+    setShowAddModal(true);
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryName('');
+    setImage('');
+    setCount('');
   };
 
   // Financial aggregates
@@ -367,11 +447,19 @@ const AdminDashboardPage = () => {
                 <p className="text-xs text-slate-400 font-semibold">Listing all available stock SKUs</p>
               </div>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={openAddModal}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md shadow-emerald-500/10 active:scale-95"
               >
                 <FiPlus className="stroke-[3]" />
                 <span>NEW PRODUCT</span>
+              </button>
+
+              <button
+                onClick={() => setShowAddModalCategoty(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md shadow-emerald-500/10 active:scale-95"
+              >
+                <FiPlus className="stroke-[3]" />
+                <span>NEW CATEGORY</span>
               </button>
             </div>
 
@@ -504,21 +592,67 @@ const AdminDashboardPage = () => {
 
       </section>
 
-      {/* Add Product Modal */}
-      {showAddModal && (
+      {/* Add Category Modal */}
+      {showAddModalCategoty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg border border-slate-100 dark:border-slate-800 shadow-2xl relative my-8">
             <button 
-              onClick={() => setShowAddModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:opacity-80 transition-opacity animate-pulse"
+              onClick={() => setShowAddModalCategoty(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:opacity-85 transition-opacity"
             >
               <FiX className="h-5 w-5" />
+            </button>
+            
+            <h3 className="text-lg font-black font-display mb-4 text-slate-900 dark:text-white">Add New Catalog Category</h3>
+            
+            <form onSubmit={handleAddCategory} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
+              
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[10px] text-slate-450 font-bold uppercase">Name</label>
+                <input required type="text" placeholder="Organic Fruits" value={categoryName} onChange={e => setCategoryName(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-450 font-bold uppercase">Image URL</label>
+                <input type="text" placeholder="https://images.unsplash.com/..." value={image} onChange={e => setImage(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-450 font-bold uppercase">Initial Count</label>
+                <input type="number" placeholder="0" value={count} onChange={e => setCount(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <button
+                type="submit"
+                className="sm:col-span-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md"
+              >
+                Save New Category
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg border border-slate-100 dark:border-slate-800 shadow-2xl relative my-8 text-slate-900 dark:text-white">
+            <button 
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:opacity-85 transition-opacity"
+            >
+              <FiX className="h-5 w-5 text-slate-500 dark:text-slate-400" />
             </button>
             
             <h3 className="text-lg font-black font-display mb-4 text-slate-900 dark:text-white">Add New Catalog Product</h3>
             
             <form onSubmit={handleAddProduct} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
               
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Product ID (Optional)</label>
+                <input type="text" placeholder="e.g. P001" value={prodId} onChange={e => setProdId(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Name</label>
                 <input required type="text" placeholder="Organic Strawberries" value={prodName} onChange={e => setProdName(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
@@ -527,46 +661,67 @@ const AdminDashboardPage = () => {
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Category</label>
                 <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20 cursor-pointer">
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Price (₹)</label>
-                <input required type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent" />
+                <input required type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Old Price (₹)</label>
+                <input type="number" value={prodOldPrice} onChange={e => setProdOldPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Discount (%)</label>
-                <input type="number" value={prodDiscount} onChange={e => setProdDiscount(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent" />
+                <input type="number" value={prodDiscount} onChange={e => setProdDiscount(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Weight (e.g. 500 g)</label>
-                <input required type="text" placeholder="250 g" value={prodWeight} onChange={e => setProdWeight(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent" />
+                <input required type="text" placeholder="250 g" value={prodWeight} onChange={e => setProdWeight(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">ETA Checker (e.g. 10 mins)</label>
-                <input required type="text" placeholder="10 mins" value={prodEta} onChange={e => setProdEta(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent" />
+                <input required type="text" placeholder="10 mins" value={prodEta} onChange={e => setProdEta(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Main Image URL</label>
+                <input required type="text" placeholder="https://example.com/images/apple.jpg" value={prodImage} onChange={e => setProdImage(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Additional Image URLs (Comma-separated)</label>
+                <textarea placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg" value={prodImages} onChange={e => setProdImages(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[50px] border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="sm:col-span-2 space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Description</label>
-                <textarea value={prodDescription} onChange={e => setProdDescription(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[60px] border border-transparent" />
+                <textarea value={prodDescription} onChange={e => setProdDescription(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[60px] border border-transparent focus:border-emerald-500/20" />
               </div>
 
-              <div className="sm:col-span-2 flex items-center space-x-3 py-1">
-                <input type="checkbox" checked={prodInStock} onChange={e => setProdInStock(e.target.checked)} className="w-4.5 h-4.5 accent-emerald-605" id="prodInStock" />
-                <label htmlFor="prodInStock" className="text-slate-650 cursor-pointer">Product is in Stock</label>
+              <div className="sm:col-span-2 flex items-center space-x-3 py-1 text-slate-700 dark:text-slate-350">
+                <input type="checkbox" checked={prodInStock} onChange={e => setProdInStock(e.target.checked)} className="w-4.5 h-4.5 accent-emerald-600" id="prodInStock" />
+                <label htmlFor="prodInStock" className="cursor-pointer font-bold">Product is in Stock</label>
               </div>
 
-              <button
-                type="submit"
-                className="sm:col-span-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md"
-              >
-                Save New Product
-              </button>
+              {categories.length === 0 ? (
+                <div className="sm:col-span-2 text-rose-500 font-bold bg-rose-50 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900 text-center">
+                  Please add at least one category before adding a product.
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  className="sm:col-span-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md shadow-emerald-500/10 active:scale-95"
+                >
+                  Save New Product
+                </button>
+              )}
             </form>
           </div>
         </div>
@@ -575,12 +730,12 @@ const AdminDashboardPage = () => {
       {/* Edit Product Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg border border-slate-100 dark:border-slate-800 shadow-2xl relative my-8">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg border border-slate-100 dark:border-slate-800 shadow-2xl relative my-8 text-slate-900 dark:text-white">
             <button 
               onClick={() => setShowEditModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:opacity-80 transition-opacity"
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:opacity-85 transition-opacity"
             >
-              <FiX className="h-5 w-5" />
+              <FiX className="h-5 w-5 text-slate-500 dark:text-slate-400" />
             </button>
             
             <h3 className="text-lg font-black font-display mb-4 text-slate-900 dark:text-white">Modify Catalog Item</h3>
@@ -589,49 +744,64 @@ const AdminDashboardPage = () => {
               
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Name</label>
-                <input required type="text" value={prodName} onChange={e => setProdName(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white" />
+                <input required type="text" value={prodName} onChange={e => setProdName(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Category</label>
-                <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white cursor-pointer">
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20 cursor-pointer">
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Price (₹)</label>
-                <input required type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white" />
+                <input required type="number" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Old Price (₹)</label>
+                <input type="number" value={prodOldPrice} onChange={e => setProdOldPrice(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Discount (%)</label>
-                <input type="number" value={prodDiscount} onChange={e => setProdDiscount(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white" />
+                <input type="number" value={prodDiscount} onChange={e => setProdDiscount(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Weight</label>
-                <input required type="text" value={prodWeight} onChange={e => setProdWeight(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white" />
+                <input required type="text" value={prodWeight} onChange={e => setProdWeight(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">ETA Delivery</label>
-                <input required type="text" value={prodEta} onChange={e => setProdEta(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white" />
+                <input required type="text" value={prodEta} onChange={e => setProdEta(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Main Image URL</label>
+                <input required type="text" value={prodImage} onChange={e => setProdImage(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white border border-transparent focus:border-emerald-500/20" />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase">Additional Image URLs (Comma-separated)</label>
+                <textarea placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg" value={prodImages} onChange={e => setProdImages(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[50px] border border-transparent focus:border-emerald-500/20" />
               </div>
 
               <div className="sm:col-span-2 space-y-1">
                 <label className="text-[10px] text-slate-400 font-bold uppercase">Description</label>
-                <textarea value={prodDescription} onChange={e => setProdDescription(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[60px]" />
+                <textarea value={prodDescription} onChange={e => setProdDescription(e.target.value)} className="w-full p-2.5 bg-slate-100 dark:bg-slate-950 rounded-xl outline-none text-slate-900 dark:text-white min-h-[60px] border border-transparent focus:border-emerald-500/20" />
               </div>
 
-              <div className="sm:col-span-2 flex items-center space-x-3 py-1">
+              <div className="sm:col-span-2 flex items-center space-x-3 py-1 text-slate-700 dark:text-slate-350">
                 <input type="checkbox" checked={prodInStock} onChange={e => setProdInStock(e.target.checked)} className="w-4.5 h-4.5 accent-emerald-600" id="editProdInStock" />
-                <label htmlFor="editProdInStock" className="text-slate-650 cursor-pointer">Product is in Stock</label>
+                <label htmlFor="editProdInStock" className="cursor-pointer font-bold">Product is in Stock</label>
               </div>
 
               <button
                 type="submit"
-                className="sm:col-span-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md"
+                className="sm:col-span-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md shadow-emerald-500/10 active:scale-95"
               >
                 Save Modifications
               </button>

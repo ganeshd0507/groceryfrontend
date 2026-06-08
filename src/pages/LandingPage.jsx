@@ -50,10 +50,8 @@ const LandingPage = () => {
       }
     };
     
-    if (products.length === 0) {
-      fetchData();
-    }
-  }, [dispatch, products.length]);
+    fetchData();
+  }, [dispatch]);
 
   const handleCategoryClick = (catId) => {
     dispatch(updateFilter({ key: 'category', value: catId }));

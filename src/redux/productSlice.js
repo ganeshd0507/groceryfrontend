@@ -35,6 +35,9 @@ const productSlice = createSlice({
     setCategoriesSuccess: (state, action) => {
       state.categories = action.payload;
     },
+    addCategoryLocal: (state, action) => {
+      state.categories.push(action.payload);
+    },
     updateFilter: (state, action) => {
       const { key, value } = action.payload;
       state.filters[key] = value;
@@ -66,6 +69,7 @@ export const {
   setProductsSuccess,
   setProductsFailure,
   setCategoriesSuccess,
+  addCategoryLocal,
   updateFilter,
   resetFilters,
   setSortBy,

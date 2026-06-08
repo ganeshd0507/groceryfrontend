@@ -34,6 +34,11 @@ const LoginPage = () => {
   };
 
   const handleSocialClick = (platform) => {
+    const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false';
+    if (!useMockApi) {
+      triggerToast('Social Login is not supported with the real backend. Please sign in with email and password or register a new account.', 'warning');
+      return;
+    }
     dispatch(loginStart());
     setTimeout(() => {
       const mockResponse = {

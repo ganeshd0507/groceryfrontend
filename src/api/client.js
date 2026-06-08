@@ -1,17 +1,37 @@
 import axios from 'axios';
 import { PRODUCTS, CATEGORIES } from '../services/mockData';
+import { store } from '../redux/store';
+
+const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false';
 
 // Create a custom Axios instance
 const apiClient = axios.create({
-  baseURL: 'https://api.grocerydelivery.mock/v1',
+  baseURL: useMockApi 
+    ? 'https://api.grocerydelivery.mock/v1'
+    : 'http://localhost:8080/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+// Axios request interceptor to automatically attach authorization header
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = store.getState().auth.token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Mock database in memory for CRUD actions
 let localProducts = [...PRODUCTS];
+let localCategories = [...CATEGORIES];
 let localOrders = [
   {
     id: 'ORD-1002',
@@ -50,7 +70,8 @@ let localOrders = [
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Custom adapter to mock all requests instead of hitting a real server
-apiClient.defaults.adapter = async (config) => {
+if (useMockApi) {
+  apiClient.defaults.adapter = async (config) => {
   await delay(350); // Simulate network lag
 
   const { url, method, data } = config;
@@ -145,9 +166,27 @@ apiClient.defaults.adapter = async (config) => {
   // GET /categories
   if (url.includes('/categories') && method === 'get') {
     return {
-      data: CATEGORIES,
+      data: localCategories,
       status: 200,
       statusText: 'OK',
+      headers: {},
+      config,
+    };
+  }
+
+  // POST /categories
+  if (url.includes('/categories') && method === 'post') {
+    const newCategory = {
+      id: parsedData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: parsedData.name,
+      image: parsedData.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=200',
+      count: parsedData.count ? Number(parsedData.count) : 0,
+    };
+    localCategories.push(newCategory);
+    return {
+      data: newCategory,
+      status: 201,
+      statusText: 'Created',
       headers: {},
       config,
     };
@@ -255,5 +294,6 @@ apiClient.defaults.adapter = async (config) => {
     data: { message: 'Mock API path not handled' }
   };
 };
+}
 
 export default apiClient;

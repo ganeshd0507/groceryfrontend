@@ -8,6 +8,7 @@ import {
 import { selectCartItemsCount, cartSelector } from '../redux/cartSlice';
 import { selectUser, selectIsAuthenticated, toggleDarkMode, selectDarkMode } from '../redux/authSlice';
 import { updateFilter } from '../redux/productSlice';
+import { useToast } from '../components/Toast';
 
 const MainLayout = ({ children, customToast }) => {
   const count = useSelector(selectCartItemsCount);
@@ -18,11 +19,13 @@ const MainLayout = ({ children, customToast }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const triggerToast = useToast();
 
   const [searchVal, setSearchVal] = useState('');
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [activeAddress, setActiveAddress] = useState('Gurgaon, DLF Phase 3');
   const [showCartDropdown, setShowCartDropdown] = useState(false);
+  const [loadingLiveLocation, setLoadingLiveLocation] = useState(false);
 
   const locations = [
     'Gurgaon, DLF Phase 3',
@@ -58,6 +61,86 @@ const MainLayout = ({ children, customToast }) => {
   const changeAddress = (addr) => {
     setActiveAddress(addr);
     setShowLocationModal(false);
+  };
+
+  const handleUseLiveLocation = () => {
+    if (!navigator.geolocation) {
+      triggerToast('Geolocation is not supported by your browser', 'error');
+      return;
+    }
+
+    setLoadingLiveLocation(true);
+    triggerToast('Detecting your live location...', 'info');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          // Fetch from OpenStreetMap Nominatim reverse geocoding API
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'FreshBasketGroceryApp/1.0'
+              }
+            }
+          );
+          if (!response.ok) throw new Error('Failed to reverse geocode');
+          const data = await response.json();
+          
+          // Construct a friendly address string
+          const addressParts = [];
+          if (data.address) {
+            const addr = data.address;
+            if (addr.road) addressParts.push(addr.road);
+            if (addr.suburb) addressParts.push(addr.suburb);
+            if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
+            if (addr.city_district) addressParts.push(addr.city_district);
+            if (addr.village) addressParts.push(addr.village);
+            if (addr.town) addressParts.push(addr.town);
+            if (addr.city) addressParts.push(addr.city);
+            if (addr.state) addressParts.push(addr.state);
+          }
+          
+          let friendlyAddress = addressParts.slice(0, 3).join(', ');
+          if (!friendlyAddress) {
+            friendlyAddress = data.display_name || `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+          }
+          
+          // Truncate address if it's too long
+          if (friendlyAddress.length > 50) {
+            friendlyAddress = friendlyAddress.substring(0, 47) + '...';
+          }
+
+          setActiveAddress(friendlyAddress);
+          setShowLocationModal(false);
+          triggerToast('Location updated successfully!', 'success');
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          // Fallback to coordinates
+          const fallbackAddr = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+          setActiveAddress(fallbackAddr);
+          setShowLocationModal(false);
+          triggerToast('Updated using fallback coordinates', 'warning');
+        } finally {
+          setLoadingLiveLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMsg = 'Failed to retrieve your location';
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMsg = 'Location permission denied by user';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMsg = 'Location information is unavailable';
+        } else if (error.code === error.TIMEOUT) {
+          errorMsg = 'Location request timed out';
+        }
+        triggerToast(errorMsg, 'error');
+        setLoadingLiveLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
   };
 
   return (
@@ -352,6 +435,26 @@ const MainLayout = ({ children, customToast }) => {
             <p className="text-xs text-slate-450 mb-4">Select a delivery address to view exact delivery times and custom banners.</p>
             
             <div className="space-y-2 mb-4">
+              
+              {/* Detect Live Location Button */}
+              <button
+                onClick={handleUseLiveLocation}
+                disabled={loadingLiveLocation}
+                className="w-full mb-3 p-3.5 bg-emerald-650 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-2xl flex items-center justify-center space-x-2 text-xs font-black transition-all shadow-md shadow-emerald-500/10 active:scale-95 cursor-pointer"
+              >
+                {loadingLiveLocation ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                )}
+                <span>{loadingLiveLocation ? 'Detecting Location...' : 'Use Live Location'}</span>
+              </button>
+
+              <div className="border-b border-slate-100 dark:border-slate-800/60 my-2" />
+
               {locations.map((loc, idx) => (
                 <button
                   key={idx}

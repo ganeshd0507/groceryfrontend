@@ -146,7 +146,7 @@ const ProductDetailsPage = () => {
         <div className="space-y-6">
           <div className="space-y-2">
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-lg">
-              {product.category.replace('-', ' & ')}
+              {product.category?.replace('-', ' & ') || ''}
             </span>
             <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight mt-2">{product.name}</h1>
             

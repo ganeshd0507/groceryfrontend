@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiUser, FiMail, FiPhone, FiArrowRight } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiArrowRight, FiLock } from 'react-icons/fi';
 import { loginStart, loginSuccess, loginFailure } from '../redux/authSlice';
 import { apiService } from '../services/apiService';
 import { useToast } from '../components/Toast';
@@ -15,15 +15,17 @@ const RegisterPage = () => {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('USER');
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !phone) return;
+    if (!name || !email || !password || !phone) return;
 
     dispatch(loginStart());
     try {
-      const response = await apiService.register({ name, email, phone });
+      const response = await apiService.register({ name, email, password, phone, role });
       dispatch(loginSuccess(response));
       triggerToast(`Account created! Welcome, ${name}!`, 'success');
       navigate('/');
@@ -45,7 +47,7 @@ const RegisterPage = () => {
           <p className="text-xs text-slate-400 font-bold">Join freshbasket today for rapid 10-minute deliveries</p>
         </div>
 
-        <form onSubmit={handleRegisterSubmit} className="space-y-4 relative">
+        <form onSubmit={handleRegisterSubmit} className="space-y-4 relative text-left">
           
           <div className="space-y-1">
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Full Name</label>
@@ -78,6 +80,21 @@ const RegisterPage = () => {
           </div>
 
           <div className="space-y-1">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Password</label>
+            <div className="relative group">
+              <input
+                required
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-emerald-500/30 rounded-2xl text-xs font-semibold outline-none focus:ring-4 focus:ring-emerald-500/10 text-slate-900 dark:text-white"
+              />
+              <FiLock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone Number</label>
             <div className="relative group">
               <input
@@ -90,6 +107,18 @@ const RegisterPage = () => {
               />
               <FiPhone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500" />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Account Type</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-emerald-500/30 rounded-2xl text-xs font-semibold outline-none focus:ring-4 focus:ring-emerald-500/10 text-slate-900 dark:text-white cursor-pointer"
+            >
+              <option value="USER">Customer Account (User)</option>
+              <option value="ADMIN">Store Manager (Admin)</option>
+            </select>
           </div>
 
           <button

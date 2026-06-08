@@ -34,10 +34,8 @@ const ProductListingPage = () => {
       }
     };
     
-    if (products.length === 0) {
-      fetchData();
-    }
-  }, [dispatch, products.length]);
+    fetchData();
+  }, [dispatch]);
 
   const handleFilterChange = (key, value) => {
     dispatch(updateFilter({ key, value }));

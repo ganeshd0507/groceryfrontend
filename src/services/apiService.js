@@ -33,6 +33,11 @@ export const apiService = {
     return response.data;
   },
 
+  async addCategory(categoryData) {
+    const response = await apiClient.post('/categories', categoryData);
+    return response.data;
+  },
+
   // Order Endpoints
   async getOrders() {
     const response = await apiClient.get('/orders');

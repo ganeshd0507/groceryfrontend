@@ -1,12 +1,15 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+const token = localStorage.getItem('token');
+const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+
 const initialState = {
-  user: null, // { name, email, phone, savedAddresses: [], wishlist: [], orders: [] }
-  token: null,
-  isAuthenticated: false,
+  user: user,
+  token: token,
+  isAuthenticated: !!token,
   isLoading: false,
   error: null,
-  darkMode: false // Add UI preference here for simple global state access
+  darkMode: localStorage.getItem('darkMode') === 'true'
 };
 
 const authSlice = createSlice({
@@ -22,6 +25,8 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
     },
     loginFailure: (state, action) => {
       state.isLoading = false;
@@ -31,10 +36,13 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     },
     updateProfile: (state, action) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     addAddress: (state, action) => {
@@ -44,11 +52,13 @@ const authSlice = createSlice({
           ...action.payload
         };
         state.user.savedAddresses.push(newAddress);
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     removeAddress: (state, action) => {
       if (state.user) {
         state.user.savedAddresses = state.user.savedAddresses.filter(addr => addr.id !== action.payload);
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     toggleWishlist: (state, action) => {
@@ -60,6 +70,7 @@ const authSlice = createSlice({
         } else {
           state.user.wishlist.push(id);
         }
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     addOrderToHistory: (state, action) => {
@@ -68,10 +79,12 @@ const authSlice = createSlice({
           state.user.orders = [];
         }
         state.user.orders.unshift(action.payload);
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     },
     toggleDarkMode: (state) => {
       state.darkMode = !state.darkMode;
+      localStorage.setItem('darkMode', state.darkMode);
     }
   }
 });
