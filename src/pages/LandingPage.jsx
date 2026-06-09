@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiArrowRight, FiClock, FiShoppingBag, FiTruck, FiShield } from 'react-icons/fi';
-import { motion } from 'framer-motion';
+import { FiArrowRight, FiClock, FiShoppingBag, FiTruck, FiShield, FiMapPin, FiSearch, FiChevronDown } from 'react-icons/fi';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { apiService } from '../services/apiService';
 import { 
   setProductsStart, setProductsSuccess, setProductsFailure, 
   setCategoriesSuccess, updateFilter 
 } from '../redux/productSlice';
+import { selectActiveAddress, setShowLocationModal } from '../redux/authSlice';
 import ProductCard from '../components/ProductCard';
 import { useToast } from '../components/Toast';
-import heroImg from '../assets/hero.png';
 import { TESTIMONIALS } from '../services/mockData';
 
 const LandingPage = () => {
@@ -19,9 +19,57 @@ const LandingPage = () => {
   const triggerToast = useToast();
   
   const { items: products, categories, loading } = useSelector((state) => state.products);
+  const activeAddress = useSelector(selectActiveAddress);
   
+  const [searchVal, setSearchVal] = useState('');
   // Timer for Flash Sale
   const [timeLeft, setTimeLeft] = useState(14400); // 4 hours in seconds
+
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const videos = [
+    "/videos/cooking_loop.mp4",
+    "/videos/grill_loop.mp4",
+    "/videos/cafe_loop.mp4"
+  ];
+
+  useEffect(() => {
+    const videoInterval = setInterval(() => {
+      setActiveVideoIndex((prev) => (prev + 1) % videos.length);
+    }, 9000); // cycle every 9 seconds
+    return () => clearInterval(videoInterval);
+  }, []);
+
+  const { scrollY } = useScroll();
+  // Parallax: background moves slower than scrolling speed (moves down by 12% over 600px of scroll)
+  const bgY = useTransform(scrollY, [0, 600], ["0%", "12%"]);
+  // Fade out background slightly as user scrolls down
+  const bgOpacity = useTransform(scrollY, [0, 600], [1, 0.25]);
+  // Dynamic brightness adjustments (cinematic Zomato highlight)
+  const bgFilter = useTransform(scrollY, [0, 400], ["brightness(0.55)", "brightness(0.25)"]);
+
+  // Staggered entry animation variants for the hero contents
+  const heroContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.12,
+        delayChildren: 0.15,
+      }
+    }
+  };
+
+  const heroItemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.8,
+        ease: [0.16, 1, 0.3, 1] // OutExpo
+      }
+    }
+  };
   
   useEffect(() => {
     const timer = setInterval(() => {
@@ -58,85 +106,174 @@ const LandingPage = () => {
     navigate('/products');
   };
 
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    dispatch(updateFilter({ key: 'search', value: searchVal }));
+    navigate('/products');
+  };
+
+  const handleScrollDown = () => {
+    const nextSection = document.getElementById('shop-content');
+    if (nextSection) {
+      nextSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const featuredProducts = products.filter(p => p.rating >= 4.6).slice(0, 4);
   const flashSaleProducts = products.filter(p => p.discount >= 12 && p.inStock).slice(0, 4);
 
   return (
-    <div className="space-y-12 sm:space-y-16 pb-12">
+    <div className="pb-12">
       
-      {/* Hero Banner Section with modern Dribbble floating blobs and rich gradients */}
-      <section className="relative rounded-[40px] overflow-hidden bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-900 text-white p-8 sm:p-14 lg:p-16 flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-emerald-950/20">
-        
-        {/* Floating gradient blur blobs for premium aesthetic */}
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-15%] right-[-5%] w-96 h-96 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none" />
-        
-        <div className="max-w-xl space-y-6 text-center md:text-left z-10">
-          <motion.span 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center px-4 py-1.5 rounded-full bg-emerald-500/20 dark:bg-emerald-400/10 backdrop-blur-md text-[10px] font-black uppercase tracking-widest border border-emerald-400/30 text-emerald-200"
-          >
-            ⚡ Delivery in 10 minutes
-          </motion.span>
-          <motion.h1 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-6xl font-black font-display tracking-tight leading-[1.05]"
-          >
-            Your Daily Groceries, <br />
-            Delivered <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-400">Fresh & Fast</span>
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-sm sm:text-base text-emerald-100/90 font-medium max-w-sm"
-          >
-            Order farm-fresh fruits, vegetables, bread, dairy, and snacks at low warehouse rates.
-          </motion.p>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="pt-2 flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4"
-          >
-            <Link
-              to="/products"
-              className="px-8 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-900 rounded-2xl shadow-xl shadow-yellow-500/10 hover:shadow-yellow-500/25 text-sm font-black transition-all active:scale-95 flex items-center space-x-2 w-full sm:w-auto justify-center"
-            >
-              <span>Order Now</span>
-              <FiArrowRight className="w-4.5 h-4.5 stroke-[3]" />
-            </Link>
-            <Link
-              to="/products"
-              onClick={() => dispatch(updateFilter({ key: 'category', value: 'fruits-veg' }))}
-              className="px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all w-full sm:w-auto text-center backdrop-blur-sm"
-            >
-              Fresh Vegetables
-            </Link>
-          </motion.div>
+      {/* Immersive Zomato-style Hero Section with Background entry animations */}
+      <section className="relative w-full h-[95vh] min-h-[580px] flex flex-col items-center justify-center overflow-hidden mb-12">
+        <div className="absolute inset-0 z-0 select-none pointer-events-none">
+          {videos.map((src, index) => (
+            <motion.video
+              key={src}
+              src={src}
+              autoPlay
+              muted
+              loop
+              playsInline
+              initial={{ opacity: 0 }}
+              animate={{ 
+                opacity: index === activeVideoIndex ? 1 : 0,
+                scale: index === activeVideoIndex ? 1.05 : 1.15
+              }}
+              transition={{ 
+                opacity: { duration: 1.5, ease: "easeInOut" },
+                scale: { duration: 9, ease: "linear" }
+              }}
+              style={{ y: bgY, filter: bgFilter }}
+              className="w-full h-[115%] absolute -top-[5%] left-0 right-0 object-cover"
+            />
+          ))}
+          {/* Zomato-style Cinematic Highlights (linear gradient + radial vignette) */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95 z-10 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0)_15%,rgba(0,0,0,0.85)_100%)] z-10 pointer-events-none" />
         </div>
 
-        {/* Hero Image Illustration with floating animations */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-56 sm:w-72 lg:w-96 flex-shrink-0 mt-8 md:mt-0 z-10 relative flex justify-center"
+          variants={heroContainerVariants}
+          initial="hidden"
+          animate="visible"
+          className="z-10 flex flex-col items-center max-w-4xl px-4 text-center text-white space-y-6"
         >
-          {/* Soft reflection/shadow underneath image */}
-          <div className="absolute bottom-[-15px] left-1/2 transform -translate-x-1/2 w-4/5 h-6 bg-black/35 blur-xl rounded-full" />
-          <img 
-            src={heroImg} 
-            alt="Premium groceries delivery illustration" 
-            className="w-full h-auto drop-shadow-[0_10px_30px_rgba(0,0,0,0.15)] animate-float" 
-          />
+          {/* Animated Logo */}
+          <motion.div
+            variants={heroItemVariants}
+            className="flex items-center space-x-3 mb-2 justify-center"
+          >
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-green-600 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white fill-current" viewBox="0 0 24 24">
+                <path d="M17 8C8 10 5.9 16.12 5 19c3.11-.9 9.12-3 11-12 .75 1.5.88 3.5.5 5h2c.88-3.12-.13-6.62-1.5-9z"/>
+              </svg>
+            </div>
+            <span className="text-3xl sm:text-5xl font-black font-display tracking-tight text-white">
+              fresh<span className="text-emerald-400">basket</span>
+            </span>
+          </motion.div>
+
+          {/* Heading */}
+          <motion.h1
+            variants={heroItemVariants}
+            className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight max-w-3xl"
+          >
+            India's #1 food & grocery delivery app
+          </motion.h1>
+
+          <motion.p
+            variants={heroItemVariants}
+            className="text-sm sm:text-base md:text-lg text-slate-200 max-w-xl font-medium"
+          >
+            Experience fast & easy online ordering on the freshbasket app
+          </motion.p>
+
+          {/* Download Badges */}
+          <motion.div
+            variants={heroItemVariants}
+            className="flex flex-row gap-3 sm:gap-4 pt-2 justify-center"
+          >
+            <a href="#" className="bg-black/50 border border-white/10 hover:border-white/30 hover:bg-black/75 rounded-xl px-4 py-2.5 flex items-center space-x-2 text-left cursor-pointer transition-all hover:scale-[1.03] active:scale-95 shadow-md">
+              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.27V18.73c0 .89.97 1.45 1.75.98l11.23-6.73c.75-.45.75-1.55 0-2l-11.23-6.7c-.78-.47-1.75.09-1.75.99M16.5 12L7.15 6.4c-.47-.28-1.07.06-1.07.6v10c0 .54.6.88 1.07.6L16.5 12z"/></svg>
+              <div>
+                <p className="text-[7px] text-slate-400 uppercase font-extrabold tracking-wider">GET IT ON</p>
+                <p className="text-xs font-black leading-tight text-white">Google Play</p>
+              </div>
+            </a>
+            <a href="#" className="bg-black/50 border border-white/10 hover:border-white/30 hover:bg-black/75 rounded-xl px-4 py-2.5 flex items-center space-x-2 text-left cursor-pointer transition-all hover:scale-[1.03] active:scale-95 shadow-md">
+              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C3.82 16.34 3.75 9.77 7.55 9.4c1.13.1 1.95.74 2.65.74.7 0 1.63-.78 3-.66 1.45.13 2.5.76 3.1 1.62-2.77 1.67-2.08 5.25.68 6.38-.68 1.71-1.45 3.4-2.23 3.8M14.97 7.03c.55-.66.86-1.57.75-2.48-.84.05-1.85.58-2.43 1.25-.49.56-.93 1.5.88 2.37.66.08 1.3-.48 1.68-1.14"/></svg>
+              <div>
+                <p className="text-[7px] text-slate-400 uppercase font-extrabold tracking-wider">Download on the</p>
+                <p className="text-xs font-black leading-tight text-white">App Store</p>
+              </div>
+            </a>
+          </motion.div>
+
+          {/* Location & Search widget */}
+          <motion.div
+            variants={heroItemVariants}
+            className="w-full max-w-2xl pt-4 px-2 sm:px-0"
+          >
+            <div className="flex flex-col md:flex-row bg-white dark:bg-slate-900 rounded-2xl md:rounded-full shadow-2xl p-2 w-full gap-3 md:gap-0 md:items-center text-slate-800 dark:text-slate-200">
+              
+              {/* Location Picker */}
+              <button
+                type="button"
+                onClick={() => dispatch(setShowLocationModal(true))}
+                className="flex items-center space-x-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl md:rounded-l-full md:w-[35%] transition-colors duration-300 cursor-pointer text-left"
+              >
+                <FiMapPin className="text-emerald-500 w-5 h-5 flex-shrink-0" />
+                <span className="text-xs font-bold truncate flex-1 text-slate-700 dark:text-slate-255">
+                  {activeAddress}
+                </span>
+                <FiChevronDown className="text-slate-400 w-4 h-4 flex-shrink-0" />
+              </button>
+
+              {/* Separator */}
+              <div className="hidden md:block w-[1px] h-8 bg-slate-200 dark:bg-slate-800 mx-2" />
+
+              {/* Search Field */}
+              <div className="flex-grow flex items-center pl-4 pr-1 py-1">
+                <FiSearch className="text-slate-450 w-5 h-5 mr-3 flex-shrink-0" />
+                <form onSubmit={handleSearchSubmit} className="flex-grow flex items-center">
+                  <input
+                    type="text"
+                    placeholder="Search for fresh fruits, vegetables, bread, dairy..."
+                    value={searchVal}
+                    onChange={(e) => setSearchVal(e.target.value)}
+                    className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs font-bold text-slate-950 dark:text-white placeholder-slate-400"
+                  />
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl md:rounded-full text-xs font-black shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all duration-300 active:scale-95 cursor-pointer ml-2 whitespace-nowrap"
+                  >
+                    Search
+                  </button>
+                </form>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
 
+        {/* Scroll Indicator */}
+        <div 
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer text-white/70 hover:text-white transition-colors z-10" 
+          onClick={handleScrollDown}
+        >
+          <span className="text-[10px] font-black uppercase tracking-widest mb-1.5">Scroll Down</span>
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          >
+            <FiChevronDown className="w-5 h-5 stroke-[3]" />
+          </motion.div>
+        </div>
       </section>
+
+      {/* Constraints wrapper for the main landing page content */}
+      <div id="shop-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12 sm:space-y-16">
 
       {/* Categories Section */}
       <section className="space-y-6">
@@ -328,7 +465,7 @@ const LandingPage = () => {
           ))}
         </div>
       </section>
-
+      </div>
     </div>
   );
 };

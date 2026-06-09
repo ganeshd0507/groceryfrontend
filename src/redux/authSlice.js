@@ -9,7 +9,9 @@ const initialState = {
   isAuthenticated: !!token,
   isLoading: false,
   error: null,
-  darkMode: localStorage.getItem('darkMode') === 'true'
+  darkMode: localStorage.getItem('darkMode') === 'true',
+  activeAddress: localStorage.getItem('activeAddress') || 'Gurgaon, DLF Phase 3',
+  showLocationModal: false
 };
 
 const authSlice = createSlice({
@@ -85,6 +87,13 @@ const authSlice = createSlice({
     toggleDarkMode: (state) => {
       state.darkMode = !state.darkMode;
       localStorage.setItem('darkMode', state.darkMode);
+    },
+    setActiveAddress: (state, action) => {
+      state.activeAddress = action.payload;
+      localStorage.setItem('activeAddress', action.payload);
+    },
+    setShowLocationModal: (state, action) => {
+      state.showLocationModal = action.payload;
     }
   }
 });
@@ -99,7 +108,9 @@ export const {
   removeAddress,
   toggleWishlist,
   addOrderToHistory,
-  toggleDarkMode
+  toggleDarkMode,
+  setActiveAddress,
+  setShowLocationModal
 } = authSlice.actions;
 
 export default authSlice.reducer;
@@ -107,3 +118,5 @@ export const selectUser = (state) => state.auth.user;
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
 export const selectWishlist = (state) => state.auth.user ? state.auth.user.wishlist : [];
 export const selectDarkMode = (state) => state.auth.darkMode;
+export const selectActiveAddress = (state) => state.auth.activeAddress;
+export const selectShowLocationModal = (state) => state.auth.showLocationModal;
