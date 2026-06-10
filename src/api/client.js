@@ -5,15 +5,26 @@ import { store } from '../redux/store';
 const useMockApi = import.meta.env.VITE_USE_MOCK_API !== 'false';
 
 // Create a custom Axios instance
+// const apiClient = axios.create({
+//   baseURL: useMockApi 
+//     ? 'https://api.grocerydelivery.mock/v1'
+//     : 'http://localhost:8080/api/v1',
+//   timeout: 10000,
+//   headers: {
+//     'Content-Type': 'application/json',
+//   },
+// });
+
 const apiClient = axios.create({
-  baseURL: useMockApi 
+  baseURL: useMockApi
     ? 'https://api.grocerydelivery.mock/v1'
-    : 'http://localhost:8080/api/v1',
+    : 'https://grocerybackend-i2k6.onrender.com/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
 
 // Axios request interceptor to automatically attach authorization header
 apiClient.interceptors.request.use(
