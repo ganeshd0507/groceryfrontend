@@ -2,7 +2,7 @@ export const CATEGORIES = [
   {
     id: 'fruits-veg',
     name: 'Fruits & Vegetables',
-    image: 'https://images.unsplash.com/photo-1610348725531-843dff163e2c?auto=format&fit=crop&q=80&w=200',
+    image: 'https://images.unsplash.com/photo-1576179635662-9d1983e97e1e?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8QXBwbGV8ZW58MHx8MHx8fDA%3D',
     count: 24
   },
   {
@@ -101,7 +101,7 @@ export const PRODUCTS = [
     weight: '1 kg',
     rating: 4.2,
     reviewsCount: 1240,
-    image: 'https://images.unsplash.com/photo-1508747702-f520acf9b3be?auto=format&fit=crop&q=80&w=600',
+    image: 'https://images.unsplash.com/photo-1683355739329-cea18ba93f02?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8b3JnYW5pYyUyMHJlZCUyMG9uaW9ufGVufDB8fDB8fHww',
     images: [
       'https://images.unsplash.com/photo-1508747702-f520acf9b3be?auto=format&fit=crop&q=80&w=600'
     ],
@@ -205,7 +205,7 @@ export const PRODUCTS = [
     weight: '6 pcs',
     rating: 4.6,
     reviewsCount: 1540,
-    image: 'https://images.unsplash.com/photo-1516448424440-9dbca97779c1?auto=format&fit=crop&q=80&w=600',
+    image: 'https://images.unsplash.com/photo-1639194335563-d56b83f0060c?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8ZnJlc2glMjBlZ2d8ZW58MHx8MHx8fDA%3D',
     images: [
       'https://images.unsplash.com/photo-1516448424440-9dbca97779c1?auto=format&fit=crop&q=80&w=600'
     ],
