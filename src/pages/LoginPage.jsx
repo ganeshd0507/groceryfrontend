@@ -6,6 +6,7 @@ import { FaGoogle, FaApple } from 'react-icons/fa';
 import { loginStart, loginSuccess, loginFailure } from '../redux/authSlice';
 import { apiService } from '../services/apiService';
 import { useToast } from '../components/Toast';
+import { googleTestLogin } from '../services/googleTestLogin';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -59,6 +60,34 @@ const LoginPage = () => {
       navigate('/');
     }, 400);
   };
+
+
+   const handleGoogleLogin = async () => {
+  dispatch(loginStart());
+
+  try {
+    const user = await googleTestLogin();
+
+    const response = {
+      user: user,
+      token: "google-test-token"
+    };
+
+    dispatch(loginSuccess(response));
+
+    triggerToast(`Welcome, ${user.name}!`, 'success');
+
+    navigate('/');
+
+  } catch (error) {
+
+    dispatch(loginFailure(error.message));
+
+    triggerToast('Google Login Failed', 'error');
+
+    console.error(error);
+  }
+};
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center py-6 px-4">
@@ -133,7 +162,7 @@ const LoginPage = () => {
         {/* Social SSO Buttons */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <button
-            onClick={() => handleSocialClick('Google')}
+            onClick={handleGoogleLogin}
             className="py-2.5 px-4 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-850 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl flex items-center justify-center space-x-2 text-xs font-bold transition-all text-slate-700 dark:text-slate-200"
           >
             <FaGoogle className="w-4.5 h-4.5 text-rose-500" />
